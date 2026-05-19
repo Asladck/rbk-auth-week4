@@ -15,14 +15,13 @@ func Logger(log *zap.Logger) func(http.Handler) http.Handler {
 			start := time.Now()
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			next.ServeHTTP(ww, r)
-			log.Info("request",
+
+			log.Info("http_request",
+				zap.String("request_id", middleware.GetReqID(r.Context())),
 				zap.String("method", r.Method),
 				zap.String("path", r.URL.Path),
-				zap.String("query", r.URL.RawQuery),
 				zap.Int("status", ww.Status()),
-				zap.Duration("latency", time.Since(start)),
-				zap.String("remote_addr", r.RemoteAddr),
-				zap.String("request_id", middleware.GetReqID(r.Context())),
+				zap.Duration("duration", time.Since(start)),
 			)
 		})
 	}
@@ -34,9 +33,10 @@ func Recoverer(log *zap.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if rec := recover(); rec != nil {
-					log.Error("panic recovered",
-						zap.Any("panic", rec),
+					log.Error("panic_recovered",
+						zap.String("request_id", middleware.GetReqID(r.Context())),
 						zap.String("path", r.URL.Path),
+						zap.Any("panic", rec),
 					)
 					http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 				}
